@@ -72,6 +72,7 @@ class BaseDataset:
     def __repr__(self) -> str:
         return (
             f"{self.__class__.__name__}("
+            f"name={self.name}, "
             f"train={len(self.x_train)}, test={len(self.x_test)}, "
             f"shape={self.shape}, classes={self.num_classes})"
         )
