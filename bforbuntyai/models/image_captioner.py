@@ -59,8 +59,19 @@ class ImageCaptioner(BaseModel):
             load_kwargs["device"] = -1
 
         _logger.info("Loading %s...", model_name)
-        self._pipe = pipeline("image-to-text", **load_kwargs)
-        _logger.info("Ready.")
+        # transformers>=4.47 renamed "image-to-text" → "image-text-to-text"
+        for task in ("image-text-to-text", "image-to-text"):
+            try:
+                self._pipe = pipeline(task, **load_kwargs)
+                _logger.info("Ready (task=%s).", task)
+                break
+            except KeyError:
+                continue
+        else:
+            raise RuntimeError(
+                "Could not find a working image captioning pipeline task. "
+                "Try: pip install -U transformers"
+            )
 
     @staticmethod
     def _resolve_device(device: str) -> str:
