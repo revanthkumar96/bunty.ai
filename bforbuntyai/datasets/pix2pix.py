@@ -3,7 +3,10 @@ from typing import Optional, Tuple
 
 import numpy as np
 
+from .._logging import get_logger
 from .._utils import download_file, get_cache_dir
+
+_logger = get_logger("datasets.pix2pix")
 
 EDGES2SHOES_URL = "http://efrosgans.eecs.berkeley.edu/pix2pix/datasets/edges2shoes.tar.gz"
 
@@ -60,14 +63,14 @@ class Edges2Shoes:
         data_dir = cache / "edges2shoes"
 
         if not data_dir.exists():
-            print("Downloading Edges2Shoes dataset (~1.5 GB)...")
+            _logger.info("Downloading Edges2Shoes dataset (~1.5 GB)...")
             download_file(EDGES2SHOES_URL, archive)
             import tarfile
 
-            print("Extracting...")
+            _logger.info("Extracting...")
             with tarfile.open(archive, "r:gz") as tar:
                 tar.extractall(cache)
-            print("Done.")
+            _logger.info("Done.")
 
         train_dir = data_dir / "train"
         val_dir = data_dir / "val"

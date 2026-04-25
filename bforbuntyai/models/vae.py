@@ -3,7 +3,10 @@ from typing import Optional, Tuple
 import numpy as np
 
 from .._base import BaseModel
+from .._logging import get_logger
 from .._utils import get_device, plot_grid
+
+_logger = get_logger("models.vae")
 
 
 class VAE(BaseModel):
@@ -121,7 +124,7 @@ class VAE(BaseModel):
 
             avg = total / len(loader.dataset)
             self.losses.append(avg)
-            print(f"Epoch {epoch + 1}/{epochs}  loss: {avg:.4f}")
+            _logger.info("Epoch %d/%d  loss: %.4f", epoch + 1, epochs, avg)
 
         return self
 
@@ -154,9 +157,13 @@ class VAE(BaseModel):
         rec = [recon[i] for i in range(n)]
         plot_grid(orig + rec, titles=[f"Orig {i}" for i in range(n)] + [f"Recon {i}" for i in range(n)], cols=n)
 
+    @property
+    def metrics(self) -> dict:
+        return {"loss": self.losses}
+
     def visualize_latent(self, n: int = 1000) -> None:
         if self.latent_dim != 2:
-            print(f"visualize_latent() only works when latent_dim=2 (current: {self.latent_dim})")
+            _logger.warning("visualize_latent() only works when latent_dim=2 (current: %d)", self.latent_dim)
             return
         import matplotlib.pyplot as plt
         import torch
@@ -205,7 +212,7 @@ class VAE(BaseModel):
             "fc_logvar": self.fc_logvar.state_dict(),
             "decoder": self.decoder.state_dict(),
         }, path)
-        print(f"Saved to {path}")
+        _logger.info("Saved to %s", path)
 
     def load(self, path: str = "vae.pth") -> "VAE":
         import torch

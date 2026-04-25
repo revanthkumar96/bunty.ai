@@ -1,19 +1,26 @@
 from typing import List, Optional
 
 from .._base import BaseModel
+from .._logging import get_logger
 from ..auth import get_token
+
+_logger = get_logger("models.text_finetuner")
 
 
 class TextFineTuner(BaseModel):
-    """Fine-tune GPT-2 (or GPT-Neo) on a custom dataset using HuggingFace Trainer.
+    """Fine-tune any AutoModelForCausalLM-compatible model on a custom dataset.
+
+    Works with GPT-2, GPT-Neo, GPT-J, Mistral, LLaMA, Falcon, and any other
+    causal language model available on HuggingFace Hub.
 
     Usage:
         from bforbuntyai import TextFineTuner, dataset
-        data = dataset.HuggingFace("amazon_polarity", split="train[:200]")
-        tuner = TextFineTuner(dataset=data)
+        data = dataset.HuggingFace("imdb", split="train[:500]")
+        tuner = TextFineTuner(dataset=data)                     # GPT-2 default
+        tuner = TextFineTuner(dataset=data, model_name="EleutherAI/gpt-neo-125M")
         tuner.train(epochs=3)
         tuner.generate("This product is")
-        tuner.save("./my-gpt2")
+        tuner.save("./my-finetuned-model")
     """
 
     def __init__(
@@ -23,7 +30,7 @@ class TextFineTuner(BaseModel):
         token: Optional[str] = None,
     ):
         try:
-            from transformers import GPT2LMHeadModel, GPT2Tokenizer
+            from transformers import AutoModelForCausalLM, AutoTokenizer
         except ImportError:
             raise ImportError(
                 "TextFineTuner requires transformers.\n"
@@ -38,10 +45,10 @@ class TextFineTuner(BaseModel):
         if self.token:
             load_kwargs["token"] = self.token
 
-        print(f"Loading {model_name}...")
-        self.tokenizer = GPT2Tokenizer.from_pretrained(model_name, **load_kwargs)
+        _logger.info("Loading %s...", model_name)
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name, **load_kwargs)
         self.tokenizer.pad_token = self.tokenizer.eos_token
-        self._model = GPT2LMHeadModel.from_pretrained(model_name, **load_kwargs)
+        self._model = AutoModelForCausalLM.from_pretrained(model_name, **load_kwargs)
         self._output_dir = "./finetuned-model"
 
     def train(
@@ -121,7 +128,7 @@ class TextFineTuner(BaseModel):
             )
         texts = [self.tokenizer.decode(o, skip_special_tokens=True) for o in outputs]
         for i, t in enumerate(texts, 1):
-            print(f"--- Sample {i} ---\n{t}\n")
+            _logger.info("--- Sample %d ---\n%s", i, t)
         return texts
 
     def visualize(self, prompt: str = "The product is", **kwargs) -> None:
@@ -130,11 +137,11 @@ class TextFineTuner(BaseModel):
     def save(self, path: str = "./finetuned-model") -> None:
         self._model.save_pretrained(path)
         self.tokenizer.save_pretrained(path)
-        print(f"Model saved to {path}")
+        _logger.info("Model saved to %s", path)
 
     def load(self, path: str = "./finetuned-model") -> "TextFineTuner":
-        from transformers import GPT2LMHeadModel, GPT2Tokenizer
+        from transformers import AutoModelForCausalLM, AutoTokenizer
 
-        self.tokenizer = GPT2Tokenizer.from_pretrained(path)
-        self._model = GPT2LMHeadModel.from_pretrained(path)
+        self.tokenizer = AutoTokenizer.from_pretrained(path)
+        self._model = AutoModelForCausalLM.from_pretrained(path)
         return self

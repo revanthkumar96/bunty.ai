@@ -5,7 +5,10 @@ import numpy as np
 import requests
 from tqdm import tqdm
 
+from ._logging import get_logger
+
 CACHE_DIR = Path.home() / ".bforbuntyai" / "cache"
+_logger = get_logger("utils")
 
 
 def get_cache_dir() -> Path:
@@ -23,7 +26,7 @@ def get_device():
             device = torch.device("mps")
         else:
             device = torch.device("cpu")
-        print(f"Using device: {device}")
+        _logger.info("Using device: %s", device)
         return device
     except ImportError:
         return None

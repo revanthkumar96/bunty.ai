@@ -3,15 +3,23 @@ from typing import List, Optional, Union
 import numpy as np
 
 from .._base import BaseModel
+from .._logging import get_logger
 from ..auth import get_token
+
+_logger = get_logger("models.image_captioner")
 
 
 class ImageCaptioner(BaseModel):
-    """BLIP image captioning — generate text descriptions of images.
+    """Image captioning — generate text descriptions of images.
+
+    Uses pipeline('image-to-text') so it works with any compatible model:
+    BLIP, GIT, InstructBLIP, LLaVA, and others on HuggingFace Hub.
 
     Usage:
         from bforbuntyai import ImageCaptioner
-        cap = ImageCaptioner()
+        cap = ImageCaptioner()                                          # BLIP base (default)
+        cap = ImageCaptioner("nlpconnect/vit-gpt2-image-captioning")   # ViT+GPT-2
+        cap = ImageCaptioner("Salesforce/blip2-opt-2.7b")              # BLIP-2
         cap.caption("path/to/image.jpg")
         cap.caption("https://example.com/photo.jpg")
         cap.visualize(["img1.jpg", "img2.jpg"])
@@ -24,26 +32,35 @@ class ImageCaptioner(BaseModel):
         token: Optional[str] = None,
     ):
         try:
-            from transformers import BlipForConditionalGeneration, BlipProcessor
+            from transformers import pipeline
         except ImportError:
             raise ImportError(
                 "ImageCaptioner requires transformers.\n"
                 "Install with: pip install bforbuntyai[transformers]"
             )
 
+        self.model_name = model_name
         self.token = get_token(token)
         self._device = self._resolve_device(device)
 
-        load_kwargs: dict = {}
+        load_kwargs: dict = {"model": model_name}
         if self.token:
             load_kwargs["token"] = self.token
 
-        print(f"Loading {model_name}...")
-        self.processor = BlipProcessor.from_pretrained(model_name, **load_kwargs)
-        self._model = BlipForConditionalGeneration.from_pretrained(model_name, **load_kwargs)
-        self._model = self._model.to(self._device)
-        self._model.eval()
-        print("Ready.")
+        # Map device string to an integer device id for the pipeline API.
+        # pipeline accepts device=-1 (CPU), device=0 (first CUDA), etc.
+        if "cuda" in self._device:
+            try:
+                device_id = int(self._device.split(":")[-1]) if ":" in self._device else 0
+            except ValueError:
+                device_id = 0
+            load_kwargs["device"] = device_id
+        else:
+            load_kwargs["device"] = -1
+
+        _logger.info("Loading %s...", model_name)
+        self._pipe = pipeline("image-to-text", **load_kwargs)
+        _logger.info("Ready.")
 
     @staticmethod
     def _resolve_device(device: str) -> str:
@@ -65,7 +82,9 @@ class ImageCaptioner(BaseModel):
 
         if isinstance(source, np.ndarray):
             return Image.fromarray((source * 255).astype(np.uint8)).convert("RGB")
-        if source.startswith("http://") or source.startswith("https://"):
+        if isinstance(source, str) and (
+            source.startswith("http://") or source.startswith("https://")
+        ):
             import io
 
             import requests
@@ -81,16 +100,10 @@ class ImageCaptioner(BaseModel):
         max_tokens: int = 50,
         num_beams: int = 5,
     ) -> str:
-        import torch
-
         img = self._load_image(image)
-        inputs = self.processor(img, return_tensors="pt").to(self._device)
-        with torch.no_grad():
-            out = self._model.generate(
-                **inputs, max_new_tokens=max_tokens, num_beams=num_beams, early_stopping=True
-            )
-        text = self.processor.decode(out[0], skip_special_tokens=True)
-        print(f"Caption: {text}")
+        result = self._pipe(img, max_new_tokens=max_tokens, num_beams=num_beams)
+        text = result[0]["generated_text"]
+        _logger.info("Caption: %s", text)
         return text
 
     def generate(self, images: Union[str, List], **kwargs) -> Union[str, List[str]]:

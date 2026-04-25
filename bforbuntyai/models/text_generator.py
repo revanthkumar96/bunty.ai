@@ -1,15 +1,20 @@
 from typing import List, Optional
 
 from .._base import BaseModel
+from .._logging import get_logger
 from ..auth import get_token
+
+_logger = get_logger("models.text_generator")
 
 
 class TextGenerator(BaseModel):
-    """GPT-2 text generation (inference only, no training).
+    """Inference-only text generator — works with any AutoModelForCausalLM-compatible model.
 
     Usage:
         from bforbuntyai import TextGenerator
-        gen = TextGenerator()
+        gen = TextGenerator()                              # GPT-2 (default)
+        gen = TextGenerator("EleutherAI/gpt-neo-125M")   # GPT-Neo
+        gen = TextGenerator("mistralai/Mistral-7B-v0.1") # Mistral (needs token)
         gen.generate("Once upon a time")
         gen.generate("The future of AI is", max_tokens=200, num_return=3)
     """
@@ -21,7 +26,7 @@ class TextGenerator(BaseModel):
         token: Optional[str] = None,
     ):
         try:
-            from transformers import GPT2LMHeadModel, GPT2Tokenizer
+            from transformers import AutoModelForCausalLM, AutoTokenizer
         except ImportError:
             raise ImportError(
                 "TextGenerator requires transformers.\n"
@@ -35,14 +40,14 @@ class TextGenerator(BaseModel):
         if self.token:
             load_kwargs["token"] = self.token
 
-        print(f"Loading {model_name}...")
-        self.tokenizer = GPT2Tokenizer.from_pretrained(model_name, **load_kwargs)
+        _logger.info("Loading %s...", model_name)
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name, **load_kwargs)
         self.tokenizer.pad_token = self.tokenizer.eos_token
-        self._model = GPT2LMHeadModel.from_pretrained(model_name, **load_kwargs)
+        self._model = AutoModelForCausalLM.from_pretrained(model_name, **load_kwargs)
         self._device = self._resolve_device(device)
         self._model = self._model.to(self._device)
         self._model.eval()
-        print(f"Ready on {self._device}.")
+        _logger.info("Ready on %s.", self._device)
 
     @staticmethod
     def _resolve_device(device: str) -> str:
@@ -84,7 +89,7 @@ class TextGenerator(BaseModel):
             )
         texts = [self.tokenizer.decode(o, skip_special_tokens=True) for o in outputs]
         for i, t in enumerate(texts, 1):
-            print(f"--- Sample {i} ---\n{t}\n")
+            _logger.info("--- Sample %d ---\n%s", i, t)
         return texts
 
     def visualize(self, prompt: str = "Once upon a time", **kwargs) -> None:

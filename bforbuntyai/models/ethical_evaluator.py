@@ -1,7 +1,10 @@
 from typing import Dict, List, Optional, Union
 
 from .._base import BaseModel
+from .._logging import get_logger
 from ..auth import get_token
+
+_logger = get_logger("models.ethical_evaluator")
 
 _TOXICITY_THRESHOLD = 0.5
 _BIAS_THRESHOLD = 0.6
@@ -83,15 +86,18 @@ class EthicalEvaluator(BaseModel):
 
     @staticmethod
     def _print_report(r: Dict) -> None:
-        print(f"\n{'=' * 50}")
-        print(f"Text: {r['text'][:80]}{'...' if len(r['text']) > 80 else ''}")
-        print(f"Verdict: {r['verdict']}")
-        print("\nToxicity Scores:")
+        lines = [
+            f"\n{'=' * 50}",
+            f"Text: {r['text'][:80]}{'...' if len(r['text']) > 80 else ''}",
+            f"Verdict: {r['verdict']}",
+            "\nToxicity Scores:",
+        ]
         for cat, score in r["toxicity"].items():
             flag = " ⚠" if score >= _TOXICITY_THRESHOLD else ""
-            print(f"  {cat:<25} {score:.4f}{flag}")
-        print(f"\nBias: {r['bias']['label']} (confidence: {r['bias']['score']:.4f})")
-        print("=" * 50)
+            lines.append(f"  {cat:<25} {score:.4f}{flag}")
+        lines.append(f"\nBias: {r['bias']['label']} (confidence: {r['bias']['score']:.4f})")
+        lines.append("=" * 50)
+        _logger.info("\n".join(lines))
 
     def evaluate_batch(self, texts: List[str]) -> List[Dict]:
         return [self.evaluate(t) for t in texts]

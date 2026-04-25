@@ -3,7 +3,10 @@ from typing import List, Optional
 import numpy as np
 
 from .._base import BaseModel
+from .._logging import get_logger
 from .._utils import get_device, plot_grid
+
+_logger = get_logger("models.conditional_gan")
 
 
 class ConditionalGAN(BaseModel):
@@ -144,7 +147,10 @@ class ConditionalGAN(BaseModel):
 
             self.g_losses.append(g_sum / len(loader))
             self.d_losses.append(d_sum / len(loader))
-            print(f"Epoch {epoch + 1}/{epochs}  G: {self.g_losses[-1]:.4f}  D: {self.d_losses[-1]:.4f}")
+            _logger.info(
+                "Epoch %d/%d  G: %.4f  D: %.4f",
+                epoch + 1, epochs, self.g_losses[-1], self.d_losses[-1],
+            )
 
         return self
 
@@ -171,11 +177,15 @@ class ConditionalGAN(BaseModel):
     def visualize(self) -> None:
         self.generate_class()
 
+    @property
+    def metrics(self) -> dict:
+        return {"g_loss": self.g_losses, "d_loss": self.d_losses}
+
     def save(self, path: str = "cgan.pth") -> None:
         import torch
 
         torch.save({"G": self.G.state_dict(), "D": self.D.state_dict()}, path)
-        print(f"Saved to {path}")
+        _logger.info("Saved to %s", path)
 
     def load(self, path: str = "cgan.pth") -> "ConditionalGAN":
         import torch

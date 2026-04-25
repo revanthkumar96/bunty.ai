@@ -17,7 +17,10 @@ Token resolution order (used by all HF-backed models):
 import os
 from typing import Optional
 
+from ._logging import get_logger
+
 _cached_token: Optional[str] = None
+_logger = get_logger("auth")
 
 
 def login(token: Optional[str] = None) -> None:
@@ -34,9 +37,9 @@ def login(token: Optional[str] = None) -> None:
 
     try:
         user = huggingface_hub.whoami()
-        print(f"Logged in as: {user['name']}")
+        _logger.info("Logged in as: %s", user["name"])
     except Exception:
-        print("Logged in to HuggingFace Hub.")
+        _logger.info("Logged in to HuggingFace Hub.")
 
 
 def logout() -> None:
@@ -46,7 +49,7 @@ def logout() -> None:
 
     huggingface_hub.logout()
     _cached_token = None
-    print("Logged out from HuggingFace Hub.")
+    _logger.info("Logged out from HuggingFace Hub.")
 
 
 def whoami() -> dict:

@@ -10,10 +10,17 @@ HuggingFace auth:
     from bforbuntyai import auth
     auth.login()                 # interactive
     auth.login(token="hf_...")   # explicit token
+
+Logging:
+    from bforbuntyai import setup_logging
+    setup_logging(level="WARNING")   # silence training output
+    setup_logging(level="DEBUG")     # verbose
+    setup_logging(file="run.log")    # also write to a file
 """
 
 from . import auth
 from . import datasets as dataset
+from ._logging import setup_logging
 from .models import (
     AutoEncoder,
     ConditionalGAN,
@@ -46,4 +53,9 @@ __all__ = [
     # Namespaces
     "dataset",
     "auth",
+    # Logging
+    "setup_logging",
 ]
+
+# Enable INFO logging by default so training progress is visible out of the box.
+setup_logging(level="INFO")

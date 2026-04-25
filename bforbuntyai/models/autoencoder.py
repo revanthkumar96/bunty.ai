@@ -3,7 +3,10 @@ from typing import Optional
 import numpy as np
 
 from .._base import BaseModel
+from .._logging import get_logger
 from .._utils import plot_grid
+
+_logger = get_logger("models.autoencoder")
 
 
 class AutoEncoder(BaseModel):
@@ -64,7 +67,7 @@ class AutoEncoder(BaseModel):
     def train(self, epochs: int = 50, batch_size: int = 256, validation_split: float = 0.1) -> "AutoEncoder":
         self._build()
         x_train, _ = self.dataset.as_numpy("train")
-        print(f"Training AutoEncoder on {self.dataset.name} ({len(x_train)} samples)...")
+        _logger.info("Training AutoEncoder on %s (%d samples)...", self.dataset.name, len(x_train))
         self._history = self.model.fit(
             x_train,
             x_train,
@@ -93,7 +96,7 @@ class AutoEncoder(BaseModel):
         if self.model is None:
             raise RuntimeError("No trained model to save.")
         self.model.save(path)
-        print(f"Saved to {path}")
+        _logger.info("Saved to %s", path)
 
     def load(self, path: str = "autoencoder.keras") -> "AutoEncoder":
         try:

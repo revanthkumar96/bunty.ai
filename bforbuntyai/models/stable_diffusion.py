@@ -3,19 +3,25 @@ from typing import List, Optional
 import numpy as np
 
 from .._base import BaseModel
+from .._logging import get_logger
 from .._utils import plot_grid
 from ..auth import get_token
 
+_logger = get_logger("models.stable_diffusion")
+
 
 class StableDiffusion(BaseModel):
-    """Stable Diffusion text-to-image generation (inference only).
+    """Text-to-image generation — works with any diffusers pipeline.
 
-    Requires a HuggingFace token for gated model versions.
+    Uses AutoPipelineForText2Image so it supports SD 1.x, SD 2.x, SDXL,
+    Kandinsky, DeepFloyd IF, and any model with a compatible pipeline.
 
     Usage:
         from bforbuntyai import StableDiffusion, auth
-        auth.login()                          # if using a gated model
-        sd = StableDiffusion()
+        auth.login()                              # for gated models
+        sd = StableDiffusion()                    # SD v1-5 (default)
+        sd = StableDiffusion("stabilityai/stable-diffusion-xl-base-1.0")
+        sd = StableDiffusion("runwayml/stable-diffusion-v1-5")
         sd.generate("A sunset over mountains", n=4)
     """
 
@@ -27,7 +33,7 @@ class StableDiffusion(BaseModel):
     ):
         try:
             import torch
-            from diffusers import StableDiffusionPipeline
+            from diffusers import AutoPipelineForText2Image
         except ImportError:
             raise ImportError(
                 "StableDiffusion requires diffusers.\n"
@@ -38,14 +44,14 @@ class StableDiffusion(BaseModel):
         self.token = get_token(token)
         self._device = self._resolve_device(device)
 
-        print(f"Loading {model_id} on {self._device}...")
+        _logger.info("Loading %s on %s...", model_id, self._device)
         dtype = torch.float16 if "cuda" in self._device else torch.float32
 
         load_kwargs: dict = {"torch_dtype": dtype}
         if self.token:
             load_kwargs["token"] = self.token
 
-        self.pipe = StableDiffusionPipeline.from_pretrained(model_id, **load_kwargs)
+        self.pipe = AutoPipelineForText2Image.from_pretrained(model_id, **load_kwargs)
         self.pipe = self.pipe.to(self._device)
 
         if "cuda" in self._device:
@@ -54,7 +60,7 @@ class StableDiffusion(BaseModel):
             except Exception:
                 pass
 
-        print("Ready.")
+        _logger.info("Ready.")
 
     @staticmethod
     def _resolve_device(device: str) -> str:
@@ -108,7 +114,7 @@ class StableDiffusion(BaseModel):
             for i, img in enumerate(images):
                 p = Path(save_dir) / f"generated_{i}.png"
                 img.save(str(p))
-                print(f"Saved {p}")
+                _logger.info("Saved %s", p)
 
         imgs_np = [np.array(img) / 255.0 for img in images]
         plot_grid(imgs_np, cols=n)
